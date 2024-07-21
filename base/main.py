@@ -8,11 +8,10 @@ import random
 led = machine.Pin(25, machine.Pin.OUT)
 led.value(1)
 
-# UART番号とボーレートを指定
-uart = UART(0, 115200)
+
 
 #通信モジュールからのメッセージを受信(シリアル通信)
-def recive():
+def recive(uart):
     utime.sleep(1)
     for i in range(10):
         buf = uart.read(100)
@@ -20,7 +19,7 @@ def recive():
         if buf != None:
             print(buf)  #デバッグ時に使用!!!!!!!!!
             #return buf
-    return
+    return buf
 
 #LEDを点滅させる
 def led_ok():
@@ -31,32 +30,120 @@ def led_ok():
         utime.sleep(0.3)
     return
 
+def setup_sim(uart):
+    uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
+    recive(uart)
+    uart.write('AT+CGAUTH=1,3,"sora","sora@soracom.io" \r')
+    recive(uart)
+    uart.write('AT+CNCFG=1,1,"soracom.io","sora@soracom.io","sora",3\r')
+    recive(uart)
+    uart.write('AT+COPS=1,2,"44051"\r')
+    recive(uart)
+    uart.write('AT+CGNAPN\r')
+    recive(uart)
+    uart.write('AT+CNACT=0,1\r')
+    recive(uart)
+    return
+
+def setup_lora(uart):
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    uart.write('AT+ MODE= TEST\n')
+    recive(uart)
+    uart.write('AT+TEST=?\n')
+    recive(uart)
+    uart.write('AT+TEST=RFCFG,921.5,SF12,125,12,15,14,ON,OFF,OFF\n')
+    recive(uart)
+
+def get_imsi(uart):
+    return 0
+
+
+
+def rx_lora(uart):
+    recive(uart)
+    uart.write('AT+ TEST= RXLRPKT\n')
+    while True:
+        rxData = uart.read(100)
+        if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
+            rxData_str = rxData.decode()
+            print(rxData_str)
+            return rxData_str
+        
+
+def rx_json(uart,json_dict):
+    '''
+    uart = 
+    json_dict['IMSI']=
+    json_dict['txt'] = 
+    '''
+    word_count = str(31 + len(json_dict['IMSI']) + len(json_dict['txt']))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD='+word_count+',10000\r')  # mozisuunositei
+    recive(uart)
+    #uart.write('{"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}\r')
+    uart.write('{"dt":"alt","IMSI":"'+json_dict['IMSI']+'","txt":"'+json_dict['txt']+'"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+
+
+
+
 
 
 def main():
     try:
-        uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
-        recive()
-        uart.write('AT+CGAUTH=1,3,"sora","sora@soracom.io" \r')
-        recive()
-        uart.write('AT+CNCFG=1,1,"soracom.io","sora@soracom.io","sora",3\r')
-        recive()
-        uart.write('AT+COPS=1,2,"44051"\r')
-        recive()
-        uart.write('AT+CGNAPN\r')
-        recive()
-        uart.write('AT+CNACT=0,1\r')
-        recive()
-        # ping
-        uart.write('AT+SNPING4="google.com",3,16,5000\r')
-        recive()
-
-
-        
+        pass
     except:
         while True:
             led_ok() #エラー時
-    led_ok() #起動完了
+    #led_ok() #起動完了
+            
+    # UART番号とボーレートを指定
+    uart_sim = UART(0, 115200)
+    uart_lora = UART(1, 9600)
+    
+    #setup_lora(uart_lora)
+    setup_sim(uart_sim)
+    
+    
+    tx_json_data = {'dt': 'alt'}
+    tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
+    tx_json_data['text'] = 'xxxxxxxxxx01'        #### honban okikae
+    
+    tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
+    rx_json(uart_sim,tx_json_data)
+
+    
+    #rx_lora(uart_lora)
+    
+    print('return 0 OK')
+        
+
+
+
+
+
+        
+
 
 
 if __name__ == '__main__':
