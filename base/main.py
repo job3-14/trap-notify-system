@@ -10,16 +10,20 @@ led.value(1)
 
 
 
-#通信モジュールからのメッセージを受信(シリアル通信)
 def recive(uart):
+    '''
+    通信モジュールからのメッセージを受信(シリアル通信)
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
     utime.sleep(1)
     for i in range(10):
         buf = uart.read(100)
         utime.sleep(0.3)
         if buf != None:
             print(buf)  #デバッグ時に使用!!!!!!!!!
-            #return buf
-    return buf
+            return buf
+    return
 
 #LEDを点滅させる
 def led_ok():
@@ -31,6 +35,11 @@ def led_ok():
     return
 
 def setup_sim(uart):
+    '''
+    SIM7080GをAPN接続まで行う
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
     uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
     recive(uart)
     uart.write('AT+CGAUTH=1,3,"sora","sora@soracom.io" \r')
@@ -46,6 +55,12 @@ def setup_sim(uart):
     return
 
 def setup_lora(uart):
+    '''
+    Wio E5のセットアップを実行
+    周波数などをセット
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
     uart.write('AT+UART=TIMEOUT,0\n')
     recive(uart)
     uart.write('AT+ MODE= TEST\n')
@@ -56,11 +71,26 @@ def setup_lora(uart):
     recive(uart)
 
 def get_imsi(uart):
-    return 0
+    '''
+    IMSIを取得しstr型で返す
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    uart.write('AT+CIMI\r')
+    imsi = recive(uart)
+    imsi = imsi.decode()
+    imsi_find = imsi.find('440')
+    imsi = imsi[imsi_find:imsi_find+15]
+    return imsi
 
 
 
 def rx_lora(uart):
+    '''
+    Loraを受信し、受信内容を返す
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
     recive(uart)
     uart.write('AT+ TEST= RXLRPKT\n')
     while True:
@@ -71,11 +101,13 @@ def rx_lora(uart):
             return rxData_str
         
 
-def rx_json(uart,json_dict):
+def tx_json(uart,json_dict):
     '''
-    uart = 
-    json_dict['IMSI']=
-    json_dict['txt'] = 
+    jsonをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
     '''
     word_count = str(31 + len(json_dict['IMSI']) + len(json_dict['txt']))
     uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
@@ -94,7 +126,6 @@ def rx_json(uart,json_dict):
     recive(uart)
     uart.write('AT+SHBOD='+word_count+',10000\r')  # mozisuunositei
     recive(uart)
-    #uart.write('{"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}\r')
     uart.write('{"dt":"alt","IMSI":"'+json_dict['IMSI']+'","txt":"'+json_dict['txt']+'"}\r')
     recive(uart)
     uart.write('AT+SHREQ="/post",3\r')
@@ -103,6 +134,7 @@ def rx_json(uart,json_dict):
     recive(uart)
     uart.write('AT+SHDISC\r')
     recive(uart)
+    return
 
 
 
@@ -127,10 +159,10 @@ def main():
     
     tx_json_data = {'dt': 'alt'}
     tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
-    tx_json_data['text'] = 'xxxxxxxxxx01'        #### honban okikae
+    tx_json_data['txt'] = 'xxxxxxxxxx01'        #### honban okikae
     
-    tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
-    rx_json(uart_sim,tx_json_data)
+    #tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
+    tx_json(uart_sim,tx_json_data)
 
     
     #rx_lora(uart_lora)
