@@ -80,6 +80,8 @@ def get_query_record(dynamodb, table, key):
     key = 出力するメインキー
     '''
     response = table.get_item(Key={'id': key})
+    print('############')
+    print(response)
     result_data = response['Item']
     return result_data
 
@@ -102,21 +104,21 @@ def watchdog_write(dynamodb, table, imsi, watchdog):
     push_records(dynamodb, table, result_data)
     return
 
-def alert(dynamodb, table_base, table_sub, imsi, serial_number):
+def alert(dynamodb, table_base, table_sub, imsi, txt):
     '''
     アラートを発信する
     dynamodb = boto3.resource('dynamodb')
     table_base = dynamodb.Table(table_name親機)
     table_sub = dynamodb.Table(table_name子機)
     IMSI = 発信機親機IMSI
-    serial_number = 子機シリアルナンバー
+    txt = 受信内容
     '''
     # imsiからAPIを取得
     base_result = get_query_record(dynamodb, table_base, imsi)
     api = base_result['LineNotifyApi']
     
     # 子機の名前をシリアルナンバーから取得
-    sub_name = get_query_record(dynamodb, table_sub, serial_number)
+    sub_name = get_query_record(dynamodb, table_sub, txt)
     sub_name = sub_name['name']
     
     # タイムスタンプ更新
@@ -134,6 +136,7 @@ def alert(dynamodb, table_base, table_sub, imsi, serial_number):
 
 ### main
 def lambda_handler(event, context):
+    post_line_notify('6PXw02i28OwCMycNcdpZ8KqlJZUWP8BcFn5rz9xuBql', 'プログラム実行') ##########test
     table_name_base = 'Trap_notify_Kamigamo_base'
     table_name = 'Trap_notify_Kamigamo'
     #try:
@@ -156,7 +159,7 @@ def lambda_handler(event, context):
         dynamodb = boto3.resource('dynamodb')
         table_base = dynamodb.Table(table_name_base)
         table_sub = dynamodb.Table(table_name)
-        alert(dynamodb, table_base, table_sub, event['IMSI'], event['serial_number'])
+        alert(dynamodb, table_base, table_sub, event['IMSI'], event['txt'])
         
         
         
@@ -169,4 +172,4 @@ def lambda_handler(event, context):
 # wdc -> ウォッチドッグ確認 {"dt": "wdc"}
 # wdr -> ウォッチドック受信 {"dt": "wdr", "IMSI":"IMSI:testnumber"}
 # wdu -> 起動通信(timestampのみ更新) {"dt": "wdu", "IMSI":"IMSI:testnumber"}
-# alt -> アラート {"dt": "alt", "IMSI":"IMSI:testnumber", "serial_number":"xxxxxxxxxx01"}
+# alt -> アラート {"dt": "alt", "IMSI":"IMSI:testnumber", "txt":"テキスト"}
