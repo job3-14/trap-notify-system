@@ -67,7 +67,7 @@ def setup_lora(uart):
     recive(uart)
     uart.write('AT+TEST=?\n')
     recive(uart)
-    uart.write('AT+TEST=RFCFG,921.5,SF12,125,12,15,14,ON,OFF,OFF\n')
+    uart.write('AT+TEST=RFCFG,'+str(config.frequency)+',SF12,125,12,15,'+str(config.pwr)+',ON,OFF,OFF\n')
     recive(uart)
 
 def get_imsi(uart):
@@ -142,8 +142,8 @@ def tx_json(uart,json_dict):
 
 
 def main():
-    header = f'j314t+{config.version}+'
-    
+    header = f'j314t+{config.version}'
+
     try:
         pass
     except:
@@ -159,9 +159,9 @@ def main():
     #setup_sim(uart_sim)
     
     
-    tx_json_data = {'dt': 'alt'}
-    tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
-    tx_json_data['txt'] = 'xxxxxxxxxx01'        #### honban okikae
+    #tx_json_data = {'dt': 'alt'}
+    #tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
+    #tx_json_data['txt'] = 'xxxxxxxxxx01'        #### honban okikae
     
     #tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
     #tx_json(uart_sim,tx_json_data)
