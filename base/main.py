@@ -1,7 +1,7 @@
 from machine import Pin, I2C, UART
 import time
 import utime
-#import config
+import config
 import random
 
 #LED制御
@@ -142,6 +142,8 @@ def tx_json(uart,json_dict):
 
 
 def main():
+    header = f'j314t+{config.version}+'
+    
     try:
         pass
     except:
@@ -153,8 +155,8 @@ def main():
     uart_sim = UART(0, 115200)
     uart_lora = UART(1, 9600)
     
-    #setup_lora(uart_lora)
-    setup_sim(uart_sim)
+    setup_lora(uart_lora)
+    #setup_sim(uart_sim)
     
     
     tx_json_data = {'dt': 'alt'}
@@ -162,10 +164,10 @@ def main():
     tx_json_data['txt'] = 'xxxxxxxxxx01'        #### honban okikae
     
     #tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
-    tx_json(uart_sim,tx_json_data)
+    #tx_json(uart_sim,tx_json_data)
 
     
-    #rx_lora(uart_lora)
+    rx_lora(uart_lora)
     
     print('return 0 OK')
         

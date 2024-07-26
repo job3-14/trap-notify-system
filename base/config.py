@@ -1,18 +1,8 @@
 # 設定ファイル(config.py)###############
-version = 'v1' # プログラムバージョン
-serial = 'FnEC3r9ptE' # シリアルID
-SENDING_SENSE = 60  # 送信待機時間
-number = 0   # 発信番号 0~99
+version = 'v2' # プログラムバージョン
 channel = 39 # 周波数チャンネル　！！！ch24-38は簡易無線局要申請！！！
 pwr = 13  #20mw->13
-sync_10 = 100 #同期ワード
 ######################################
-
-
-# HEX_DATA = 製品記号+バージョン+個体識別番号(v1は10桁)+登録番号
-HEX_DATA = f'j314trp+{version}+{serial}-{number}'.encode('utf-8').hex()
-SENDING_SENSE_MS = SENDING_SENSE * 1000
-SYNC = hex(sync_10)[2:]
 
 # 周波数リスト(チャンネル:周波数)
 # https://www.tele.soumu.go.jp/j/adm/system/ml/920mhz/index.htm (最終確認20231016)
@@ -60,3 +50,6 @@ frequency = {
     61:928000000,
 }
 
+
+#HEX_DATA = f'j314trp+{version}+{serial}-{number}'.encode('utf-8').hex()
+FRQ = frequency[channel]
