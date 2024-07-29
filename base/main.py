@@ -78,6 +78,8 @@ def get_imsi(uart):
     '''
     uart.write('AT+CIMI\r')
     imsi = recive(uart)
+    print('###############')
+    print(imsi)
     imsi = imsi.decode()
     imsi_find = imsi.find('440')
     imsi = imsi[imsi_find:imsi_find+15]
@@ -137,13 +139,96 @@ def tx_json(uart,json_dict):
     return
 
 
+def check_header(data):
+    '''
+    受信したデータが発信機からのものか確認をする
+
+    data = loraで受信した生データ(str)
+    '''
+    return
 
 
+def pick_lora_data(data):
+    '''
+    受信したデータのデータ部のみを取り出す関数
+
+    data = loraで受信した生データ(str)
+    '''
+    start_index = data.find('"')+1
+    finish_index = data.rfind('"')
+    rx_data = data[start_index:finish_index]
+    return rx_data
+
+def gpio_power(gpio_pin, switch):
+    '''
+    GPIOのオン・オフを切り替えする関数
+    gpio_pin = machine.Pin(22, machine.Pin.OUT)
+    switch = 0->オフ, 1->オン
+    '''
+    gpio_pin.value(switch)
+    return
+
+
+def tx_lora(uart, rx_data):
+    '''
+    loraでデータを送信する関数
+
+    uart = 対応機器のuartインスタンスが必要
+    data = 送信するデータ(16進数)
+    '''
+    while True:
+        # caria cense
+        recive(uart)
+        uart.write('AT+ TEST= RXLRPKT\n')
+        utime.sleep(0.005)
+        recive(uart)
+        rxData = recive(uart)
+        if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
+            print('キャリアセンス受信')
+            utime.sleep(0.05)
+            continue
+        else:            
+            uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
+            recive(uart)
+            return
+                
+    
+
+def tx_return_lora(uart, rx_data):
+    '''
+    loraで応答データを
+
+    uart = 対応機器のuartインスタンスが必要
+    data = 送信するデータ(16進数)
+    '''
+    for i in range(5):
+        tx_lora(uart, rx_data)
+        utime.sleep(round(random.uniform(5.0, 8.0), 1)) #5.0秒から8.0秒ランダム
+
+
+def json_escape_string(s):
+    escape_chars = {
+        '\\': '\\\\',
+        '"': '\\"',
+        '\'': '\\\'',
+        '\n': '\\n',
+        '\r': '\\r',
+        '\t': '\\t',
+        '\b': '\\b',
+        '\f': '\\f',
+    }
+    
+    escaped_str = ''
+    for char in s:
+        if char in escape_chars:
+            escaped_str += escape_chars[char]
+        else:
+            escaped_str += char
+    
+    return escaped_str
 
 
 def main():
-    header = f'j314t+{config.version}'
-
     try:
         pass
     except:
@@ -154,20 +239,30 @@ def main():
     # UART番号とボーレートを指定
     uart_sim = UART(0, 115200)
     uart_lora = UART(1, 9600)
+    gpio_sim = machine.Pin(22, machine.Pin.OUT)
     
     setup_lora(uart_lora)
-    #setup_sim(uart_sim)
-    
-    
-    #tx_json_data = {'dt': 'alt'}
-    #tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
-    #tx_json_data['txt'] = 'xxxxxxxxxx01'        #### honban okikae
-    
-    #tx_json_data = {"dt":"alt","IMSI":"440525060025394","txt": "xxxxxxxxxx01"}
-    #tx_json(uart_sim,tx_json_data)
 
-    
-    rx_lora(uart_lora)
+    ############# 受信時
+    rx_row_data = rx_lora(uart_lora)
+    rx_str_data = pick_lora_data(rx_row_data)
+    print('#####')
+    print(rx_row_data)
+    header_data = f'j314t+{config.version}'.encode('utf-8').hex()
+    if header_data.lower() in rx_str_data.lower():
+        gpio_sim.value(1)        #SIM7080Gの電源を入れる
+        utime.sleep(3)
+        setup_sim(uart_sim)
+        tx_json_data = {'dt': 'alt'}
+        tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
+        tx_json_data['txt'] = json_escape_string(rx_row_data)      #### honban okikae
+        tx_json(uart_sim,tx_json_data)
+        gpio_sim.value(0)       #SIM7080Gの電源を切る
+        return_data = rx_str_data+'30'
+        tx_return_lora(uart_lora, return_data)
+
+
+
     
     print('return 0 OK')
         
@@ -182,3 +277,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
