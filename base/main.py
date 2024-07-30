@@ -3,6 +3,7 @@ import time
 import utime
 import config
 import random
+import _thread
 
 #LED制御
 led = machine.Pin(25, machine.Pin.OUT)
@@ -227,6 +228,141 @@ def json_escape_string(s):
     
     return escaped_str
 
+def extract_hour(cclk_response):
+    # 応答文字列を改行で分割して配列に変換
+    lines = cclk_response.split('\r\n')
+    
+    # +CCLKの行を見つける
+    for line in lines:
+        if line.startswith('+CCLK:'):
+            # 時刻部分を抽出
+            datetime_str = line.split('"')[1]
+            # 時刻を分割して時間部分を取得
+            hour = datetime_str.split(',')[1].split(':')[0]
+            return int(hour)
+    
+    return None
+
+
+def calculate_hours_until_4(current_hour):
+    if current_hour < 4:
+        return 4 - current_hour
+    else:
+        return 24 - current_hour + 4
+    
+
+def tx_wdu(uart,imsi):
+    '''
+    wduをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
+    '''
+    word_count = str(22 + len(imsi))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD='+word_count+',10000\r')  # mozisuunositei
+    recive(uart)
+    uart.write('{"dt":"wdu","IMSI":"'+imsi+'"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    result = recive(uart).decode()
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+    return result
+
+
+def tx_wdr(uart,imsi):
+    '''
+    wdrをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
+    '''
+    word_count = str(22 + len(imsi))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD='+word_count+',10000\r')  # mozisuunositei
+    recive(uart)
+    uart.write('{"dt":"wdr","IMSI":"'+imsi+'"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+    return
+
+def get_sleep_time(uart):
+    uart.write('AT+CCLK?\r')
+    time_sim = recive(uart).decode()
+    time_sim = extract_hour(time_sim)
+    sleep_time = calculate_hours_until_4(time_sim)
+    return sleep_time
+
+
+def watch_dog_thread(uart_sim, gpio_sim):
+    gpio_sim.value(1)
+    utime.sleep(3)
+    setup_sim(uart_sim)
+    imsi = get_imsi(uart_sim)
+    up_result = tx_wdu(uart_sim,imsi)
+    if '"POST",200' not in up_result:
+        while True:
+            led_ok() #エラー時
+    sleep_time = get_sleep_time(uart_sim) * 60 * 60
+    if sleep_time == 86400:
+        tx_wdr(uart_sim,imsi)
+    gpio_sim.value(0)
+    utime.sleep(sleep_time)
+    
+        
+    while True:
+        gpio_sim.value(1)
+        utime.sleep(3)
+        setup_sim(uart_sim)
+        tx_wdr(uart_sim,imsi)
+        sleep_time = get_sleep_time(uart_sim) * 60 * 60
+        if sleep_time == 0:
+            sleep_time = 86400
+        gpio_sim.value(0)
+        if sleep_time < 1800:
+            break
+        print(sleep_time)
+        utime.sleep(sleep_time)
+
+
+
 
 def main():
     try:
@@ -241,7 +377,9 @@ def main():
     uart_lora = UART(1, 9600)
     gpio_sim = machine.Pin(22, machine.Pin.OUT)
     
+    _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
     setup_lora(uart_lora)
+
 
     ############# 受信時
     rx_row_data = rx_lora(uart_lora)
@@ -277,4 +415,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
