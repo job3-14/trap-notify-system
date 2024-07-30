@@ -202,7 +202,7 @@ def tx_return_lora(uart, rx_data):
     uart = 対応機器のuartインスタンスが必要
     data = 送信するデータ(16進数)
     '''
-    for i in range(5):
+    for i in range(3):
         tx_lora(uart, rx_data)
         utime.sleep(round(random.uniform(5.0, 8.0), 1)) #5.0秒から8.0秒ランダム
 
@@ -382,22 +382,21 @@ def main():
 
 
     ############# 受信時
-    rx_row_data = rx_lora(uart_lora)
-    rx_str_data = pick_lora_data(rx_row_data)
-    print('#####')
-    print(rx_row_data)
-    header_data = f'j314t+{config.version}'.encode('utf-8').hex()
-    if header_data.lower() in rx_str_data.lower():
-        gpio_sim.value(1)        #SIM7080Gの電源を入れる
-        utime.sleep(3)
-        setup_sim(uart_sim)
-        tx_json_data = {'dt': 'alt'}
-        tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
-        tx_json_data['txt'] = json_escape_string(rx_row_data)      #### honban okikae
-        tx_json(uart_sim,tx_json_data)
-        gpio_sim.value(0)       #SIM7080Gの電源を切る
-        return_data = rx_str_data+'30'
-        tx_return_lora(uart_lora, return_data)
+    while True:
+        rx_row_data = rx_lora(uart_lora)
+        rx_str_data = pick_lora_data(rx_row_data)
+        header_data = f'j314t+{config.version}'.encode('utf-8').hex()
+        if header_data.lower() in rx_str_data.lower():
+            gpio_sim.value(1)        #SIM7080Gの電源を入れる
+            utime.sleep(3)
+            setup_sim(uart_sim)
+            tx_json_data = {'dt': 'alt'}
+            tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
+            tx_json_data['txt'] = json_escape_string(rx_row_data)      #### honban okikae
+            tx_json(uart_sim,tx_json_data)
+            gpio_sim.value(0)       #SIM7080Gの電源を切る
+            return_data = rx_str_data+'30'
+            tx_return_lora(uart_lora, return_data)
 
 
 
