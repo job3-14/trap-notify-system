@@ -25,6 +25,26 @@ def recive(uart):
             return buf
     return
 
+def check_return(uart):
+    '''
+    通信モジュールからのメッセージを受信(シリアル通信)
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    uart.write('AT+ TEST= RXLRPKT\n')
+    time.sleep(1)
+    recive(uart)
+    for i in range(90):
+        buf = uart.read(100)
+        time.sleep(0.3)
+        if buf != None:
+            print(buf)  #デバッグ時に使用!!!!!!!!!
+            buf = buf.decode()
+            print(buf)
+            return buf
+        time.sleep(1)
+    return None
+
 
 #LEDを点滅させる
 def led_ok():
@@ -75,22 +95,40 @@ lora_id = get_lora_id(uart)
 rx_data = f'j314t+{config.version}/{lora_id}/'.encode('utf-8').hex()
 confirmation_data = f'j314t+{config.version}/{lora_id}/0'.encode('utf-8').hex()
 
+count = 0
 while True:
     # caria cense
     recive(uart)
     uart.write('AT+ TEST= RXLRPKT\n')
-    utime.sleep(0.005)
+    recive(uart)
     rxData = recive(uart)
-    if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
+    if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
+        print(rxData)
         print('キャリアセンス受信')
-        utime.sleep(0.05)
+        utime.sleep(1)
         continue
+    # TX
+    print('tx-------------')
+    uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
+    recive(uart)
+    time.sleep(5)
+    
+    #Check Return
+    return_data = check_return(uart)
+    if return_data is not None:
+        if confirmation_data.lower() in return_data.lower():
+            print('OK!')
+            led_ok()
+            machine.deepsleep()
+        else:
+            count += 1
     else:
-        # TX
-        uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
-        recive(uart)
-        #break
-        led_ok()
-        utime.sleep(15) #30秒に１回送信
+        count += 1
+    if count == 2:
+        machine.deepsleep()
+            
+    
         
+
+
 
