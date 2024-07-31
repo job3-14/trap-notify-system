@@ -345,10 +345,10 @@ def watch_dog_thread(uart_sim, gpio_sim):
     imsi = get_imsi(uart_sim)
     up_result = tx_wdu(uart_sim,imsi)
     sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
-    print(sleep_time)
     if sleep_time == 86400000:
         tx_wdr(uart_sim,imsi)
     gpio_sim.value(0)
+    led_ok() #起動完了
     utime.sleep(sleep_time)
     
         
@@ -375,22 +375,20 @@ def watch_dog_thread(uart_sim, gpio_sim):
 
 
 def main():
+    error_count = 0
     try:
-        pass
+        # UART番号とボーレートを指定
+        uart_sim = UART(0, 115200)
+        uart_lora = UART(1, 9600)
+        gpio_sim = machine.Pin(22, machine.Pin.OUT)
+        
+        utime.sleep(3) #######
+        _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
+        setup_lora(uart_lora)
     except:
         while True:
             led_ok() #エラー時
-    #led_ok() #起動完了
             
-    # UART番号とボーレートを指定
-    uart_sim = UART(0, 115200)
-    uart_lora = UART(1, 9600)
-    gpio_sim = machine.Pin(22, machine.Pin.OUT)
-    
-    utime.sleep(3) #######
-    _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
-    setup_lora(uart_lora)
-
 
     ############# 受信時
     while True:
@@ -406,8 +404,8 @@ def main():
             utime.sleep(3)
             setup_sim(uart_sim)
             tx_json_data = {'dt': 'alt'}
-            tx_json_data['IMSI'] = get_imsi(uart_sim)   #### honban okikae
-            tx_json_data['txt'] = json_escape_string(rx_row_data)      #### honban okikae
+            tx_json_data['IMSI'] = get_imsi(uart_sim) #################
+            tx_json_data['txt'] = json_escape_string(rx_row_data)
             tx_json(uart_sim,tx_json_data)
             gpio_sim.value(0)       #SIM7080Gの電源を切る
             return_data = rx_str_data+'30'
@@ -415,8 +413,6 @@ def main():
 
 
 
-    
-    print('return 0 OK')
         
 
 
