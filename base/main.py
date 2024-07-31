@@ -340,26 +340,32 @@ def watch_dog_thread(uart_sim, gpio_sim):
     if '"POST",200' not in up_result:
         while True:
             led_ok() #エラー時
-    sleep_time = get_sleep_time(uart_sim) * 60 * 60
-    if sleep_time == 86400:
+    sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
+    print(sleep_time)
+    if sleep_time == 86400000:
         tx_wdr(uart_sim,imsi)
     gpio_sim.value(0)
     utime.sleep(sleep_time)
     
         
     while True:
+        if gpio_sim.value() == 1:
+            utime.sleep(10)
+            continue
         gpio_sim.value(1)
         utime.sleep(3)
         setup_sim(uart_sim)
         tx_wdr(uart_sim,imsi)
-        sleep_time = get_sleep_time(uart_sim) * 60 * 60
+        sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
         if sleep_time == 0:
-            sleep_time = 86400
+            sleep_time = 86400000
         gpio_sim.value(0)
-        if sleep_time < 1800:
+        if sleep_time < 1800000:
             break
         print(sleep_time)
-        utime.sleep(sleep_time)
+        time.sleep(sleep_time)
+       
+        
 
 
 
@@ -377,6 +383,7 @@ def main():
     uart_lora = UART(1, 9600)
     gpio_sim = machine.Pin(22, machine.Pin.OUT)
     
+    utime.sleep(3) #######
     _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
     setup_lora(uart_lora)
 
@@ -387,6 +394,10 @@ def main():
         rx_str_data = pick_lora_data(rx_row_data)
         header_data = f'j314t+{config.version}'.encode('utf-8').hex()
         if header_data.lower() in rx_str_data.lower():
+            if gpio_sim.value() == 1:
+                utime.sleep(90)
+            gpio_sim.value(0)
+            utime.sleep(1)
             gpio_sim.value(1)        #SIM7080Gの電源を入れる
             utime.sleep(3)
             setup_sim(uart_sim)
@@ -414,5 +425,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
