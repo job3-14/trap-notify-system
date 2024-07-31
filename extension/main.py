@@ -1,6 +1,5 @@
 from machine import Pin, I2C, UART
 import time
-import utime
 import config
 import random
 
@@ -16,10 +15,10 @@ def recive(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
-    utime.sleep(1)
+    time.sleep(1)
     for i in range(10):
         buf = uart.read(100)
-        utime.sleep(0.3)
+        time.sleep(0.3)
         if buf != None:
             print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
@@ -50,9 +49,9 @@ def check_return(uart):
 def led_ok():
     for i in range(5):
         led.value(1)
-        utime.sleep(0.3)
+        time.sleep(0.3)
         led.value(0)
-        utime.sleep(0.3)
+        time.sleep(0.3)
     return
 
 
@@ -105,7 +104,7 @@ while True:
     if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
         print(rxData)
         print('キャリアセンス受信')
-        utime.sleep(1)
+        time.sleep(1)
         continue
     # TX
     print('tx-------------')

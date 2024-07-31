@@ -1,6 +1,5 @@
 from machine import Pin, I2C, UART
 import time
-import utime
 import config
 import random
 import _thread
@@ -17,10 +16,10 @@ def recive(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
-    utime.sleep(1)
+    time.sleep(1)
     for i in range(10):
         buf = uart.read(100)
-        utime.sleep(0.3)
+        time.sleep(0.3)
         if buf != None:
             print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
@@ -30,9 +29,9 @@ def recive(uart):
 def led_ok():
     for i in range(5):
         led.value(1)
-        utime.sleep(0.3)
+        time.sleep(0.3)
         led.value(0)
-        utime.sleep(0.3)
+        time.sleep(0.3)
     return
 
 def setup_sim(uart):
@@ -181,12 +180,12 @@ def tx_lora(uart, rx_data):
         # caria cense
         recive(uart)
         uart.write('AT+ TEST= RXLRPKT\n')
-        utime.sleep(0.005)
+        time.sleep(0.005)
         recive(uart)
         rxData = recive(uart)
         if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
             print('キャリアセンス受信')
-            utime.sleep(0.05)
+            time.sleep(0.05)
             continue
         else:            
             uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
@@ -204,7 +203,7 @@ def tx_return_lora(uart, rx_data):
     '''
     for i in range(3):
         tx_lora(uart, rx_data)
-        utime.sleep(round(random.uniform(5.0, 8.0), 1)) #5.0秒から8.0秒ランダム
+        time.sleep(round(random.uniform(5.0, 8.0), 1)) #5.0秒から8.0秒ランダム
 
 
 def json_escape_string(s):
@@ -340,7 +339,7 @@ def get_sleep_time(uart):
 
 def watch_dog_thread(uart_sim, gpio_sim):
     gpio_sim.value(1)
-    utime.sleep(3)
+    time.sleep(3)
     setup_sim(uart_sim)
     imsi = get_imsi(uart_sim)
     up_result = tx_wdu(uart_sim,imsi)
@@ -351,7 +350,7 @@ def watch_dog_thread(uart_sim, gpio_sim):
     led_ok() #起動完了
     print('SLEEEEEEPTIME')
     print(sleep_time)
-    utime.sleep(sleep_time)
+    time.sleep(sleep_time)
     
         
     while True:
@@ -359,7 +358,7 @@ def watch_dog_thread(uart_sim, gpio_sim):
             time.sleep(10)
             continue
         gpio_sim.value(1)
-        utime.sleep(3)
+        time.sleep(3)
         setup_sim(uart_sim)
         tx_wdr(uart_sim,imsi)
         sleep_time = get_sleep_time(uart_sim) * 60 * 60
@@ -384,7 +383,7 @@ def main():
         uart_lora = UART(1, 9600)
         gpio_sim = machine.Pin(22, machine.Pin.OUT)
         
-        utime.sleep(3) #######
+        time.sleep(3) #######
         _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
         setup_lora(uart_lora)
     except:
@@ -403,11 +402,11 @@ def main():
             header_data = f'j314t+{config.version}'.encode('utf-8').hex()
             if header_data.lower() in rx_str_data.lower():
                 if gpio_sim.value() == 1:
-                    utime.sleep(90)
+                    time.sleep(90)
                 gpio_sim.value(0)
-                utime.sleep(1)
+                time.sleep(1)
                 gpio_sim.value(1)        #SIM7080Gの電源を入れる
-                utime.sleep(3)
+                time.sleep(3)
                 setup_sim(uart_sim)
                 tx_json_data = {'dt': 'alt'}
                 tx_json_data['IMSI'] = get_imsi(uart_sim) #################
