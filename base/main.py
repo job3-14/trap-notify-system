@@ -391,25 +391,35 @@ def main():
             
 
     ############# 受信時
+    time.sleep(70000)
     while True:
-        rx_row_data = rx_lora(uart_lora)
-        rx_str_data = pick_lora_data(rx_row_data)
-        header_data = f'j314t+{config.version}'.encode('utf-8').hex()
-        if header_data.lower() in rx_str_data.lower():
-            if gpio_sim.value() == 1:
-                utime.sleep(90)
-            gpio_sim.value(0)
-            utime.sleep(1)
-            gpio_sim.value(1)        #SIM7080Gの電源を入れる
-            utime.sleep(3)
-            setup_sim(uart_sim)
-            tx_json_data = {'dt': 'alt'}
-            tx_json_data['IMSI'] = get_imsi(uart_sim) #################
-            tx_json_data['txt'] = json_escape_string(rx_row_data)
-            tx_json(uart_sim,tx_json_data)
-            gpio_sim.value(0)       #SIM7080Gの電源を切る
-            return_data = rx_str_data+'30'
-            tx_return_lora(uart_lora, return_data)
+        try:
+            rx_row_data = rx_lora(uart_lora)
+            rx_str_data = pick_lora_data(rx_row_data)
+            header_data = f'j314t+{config.version}'.encode('utf-8').hex()
+            if header_data.lower() in rx_str_data.lower():
+                if gpio_sim.value() == 1:
+                    utime.sleep(90)
+                gpio_sim.value(0)
+                utime.sleep(1)
+                gpio_sim.value(1)        #SIM7080Gの電源を入れる
+                utime.sleep(3)
+                setup_sim(uart_sim)
+                tx_json_data = {'dt': 'alt'}
+                tx_json_data['IMSI'] = get_imsi(uart_sim) #################
+                tx_json_data['txt'] = json_escape_string(rx_row_data)
+                tx_json(uart_sim,tx_json_data)
+                gpio_sim.value(0)       #SIM7080Gの電源を切る
+                return_data = rx_str_data+'30'
+                tx_return_lora(uart_lora, return_data)
+                error_count = 0
+        except:
+             error_count += 1
+             if error_count == 3:
+                 gpio_sim.value(0)
+                 machine.deepsleep()
+             else:
+                continue
 
 
 
