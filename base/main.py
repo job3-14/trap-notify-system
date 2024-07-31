@@ -280,7 +280,14 @@ def tx_wdu(uart,imsi):
     recive(uart)
     uart.write('AT+SHREQ="/post",3\r')
     recive(uart)
-    result = recive(uart).decode()
+    try:
+        result = recive(uart).decode()
+    except:
+        while True:
+            led_ok()
+    if '"POST",200' not in result:
+        while True:
+            led_ok() #エラー時
     uart.write('AT+SHREAD=0,1024\r')
     recive(uart)
     uart.write('AT+SHDISC\r')
@@ -337,9 +344,6 @@ def watch_dog_thread(uart_sim, gpio_sim):
     setup_sim(uart_sim)
     imsi = get_imsi(uart_sim)
     up_result = tx_wdu(uart_sim,imsi)
-    if '"POST",200' not in up_result:
-        while True:
-            led_ok() #エラー時
     sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
     print(sleep_time)
     if sleep_time == 86400000:
