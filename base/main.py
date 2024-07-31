@@ -344,27 +344,29 @@ def watch_dog_thread(uart_sim, gpio_sim):
     setup_sim(uart_sim)
     imsi = get_imsi(uart_sim)
     up_result = tx_wdu(uart_sim,imsi)
-    sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
-    if sleep_time == 86400000:
+    sleep_time = get_sleep_time(uart_sim) * 60 * 60
+    if sleep_time == 86400:
         tx_wdr(uart_sim,imsi)
     gpio_sim.value(0)
     led_ok() #起動完了
+    print('SLEEEEEEPTIME')
+    print(sleep_time)
     utime.sleep(sleep_time)
     
         
     while True:
         if gpio_sim.value() == 1:
-            utime.sleep(10)
+            time.sleep(10)
             continue
         gpio_sim.value(1)
         utime.sleep(3)
         setup_sim(uart_sim)
         tx_wdr(uart_sim,imsi)
-        sleep_time = get_sleep_time(uart_sim) * 60 * 60 * 1000
+        sleep_time = get_sleep_time(uart_sim) * 60 * 60
         if sleep_time == 0:
-            sleep_time = 86400000
+            sleep_time = 86400
         gpio_sim.value(0)
-        if sleep_time < 1800000:
+        if sleep_time < 1800:
             break
         print(sleep_time)
         time.sleep(sleep_time)
@@ -391,9 +393,11 @@ def main():
             
 
     ############# 受信時
-    time.sleep(70000)
+    print('-----------------1')
+    time.sleep(90)
     while True:
         try:
+            print('-----------------2')
             rx_row_data = rx_lora(uart_lora)
             rx_str_data = pick_lora_data(rx_row_data)
             header_data = f'j314t+{config.version}'.encode('utf-8').hex()
@@ -416,6 +420,8 @@ def main():
         except:
              error_count += 1
              if error_count == 3:
+                 for i in range(10):
+                     led_ok()
                  gpio_sim.value(0)
                  machine.deepsleep()
              else:
