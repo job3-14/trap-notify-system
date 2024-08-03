@@ -4,6 +4,7 @@ import boto3
 import urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import binascii
 
 def post_line_notify(line_api_token, contents):
     '''
@@ -117,26 +118,67 @@ def alert(dynamodb, table_base, table_sub, imsi, txt):
     base_result = get_query_record(dynamodb, table_base, imsi)
     api = base_result['LineNotifyApi']
     
+    # 受信内容を解析
+    rx_data = rx_decode(txt)  # 16進数から文字列に変換
+    sn = take_sn(rx_data)  #シリアルナンバー
+    info = rx_info(txt) #電波強度など
+    
+    
     # 子機の名前をシリアルナンバーから取得
-    sub_name = get_query_record(dynamodb, table_sub, txt)
+    sub_name = get_query_record(dynamodb, table_sub, sn)
     sub_name = sub_name['name']
     
     # タイムスタンプ更新
     watchdog_write(dynamodb, table_base, imsi, False)
 
     # 通知送信
-    contents = sub_name + 'が発信されました.'
+    contents = sub_name + 'が発信されました\n\n' + info
     post_line_notify(api, contents)
     return
     
     
+def rx_decode(data):
+    '''
+    loraからのデータから受信データを16進数から文字列に変換してstrで返す
     
+    data = '+TEST: LEN:21, RSSI:-113, SNR:-6\n+TEST: RX "6A333134742B76322F35323A36303A44323A45382F"'
+    '''
+    sn_index = []
+    sn_index.append(data.find('RX')+4)
+    sn_index.append(data.rfind('"'))
+    sn = data[sn_index[0]:sn_index[1]].encode()
+    sn = binascii.unhexlify(sn).decode('utf-8')
+    return sn
+
+
+def rx_info(data):
+    '''
+    loraからのデータの付属情報を返す
+    data = '+TEST: LEN:21, RSSI:-113, SNR:-6\n+TEST: RX "6A333134742B76322F35323A36303A44323A45382F"'
+    '''
+    index = []
+    index.append(data.find('RSSI'))
+    index.append(data.rfind('+TEST')-2)
+    data_info = data[index[0]:index[1]]
+    return data_info
+
+
+def take_sn(data):
+    '''
+    受信データからシリアルナンバーを抽出する
+    data = 'j314t+v2/52:60:D2:E8/'
+    '''
+    index = []
+    index.append(data.find('/')+1)
+    index.append(data.rfind('/'))
+    data_info = data[index[0]:index[1]]
+    return data_info
     
 
 
 ### main
 def lambda_handler(event, context):
-    post_line_notify('6PXw02i28OwCMycNcdpZ8KqlJZUWP8BcFn5rz9xuBql', 'プログラム実行') ##########test
+    #post_line_notify('6PXw02i28OwCMycNcdpZ8KqlJZUWP8BcFn5rz9xuBql', 'プログラム実行') ##########test
     table_name_base = 'Trap_notify_Kamigamo_base'
     table_name = 'Trap_notify_Kamigamo'
     #try:
