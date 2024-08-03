@@ -1,3 +1,4 @@
+# v2.1
 from machine import Pin, I2C, UART
 import time
 import config
@@ -21,7 +22,7 @@ def recive(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            print(buf)  #デバッグ時に使用!!!!!!!!!
+            #print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
     return
 
@@ -78,8 +79,8 @@ def get_imsi(uart):
     '''
     uart.write('AT+CIMI\r')
     imsi = recive(uart)
-    print('###############')
-    print(imsi)
+    #print('###############')
+    #print(imsi)
     imsi = imsi.decode()
     imsi_find = imsi.find('440')
     imsi = imsi[imsi_find:imsi_find+15]
@@ -99,7 +100,7 @@ def rx_lora(uart):
         rxData = uart.read(100)
         if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
             rxData_str = rxData.decode()
-            print(rxData_str)
+            #print(rxData_str)
             return rxData_str
         
 
@@ -184,7 +185,7 @@ def tx_lora(uart, rx_data):
         recive(uart)
         rxData = recive(uart)
         if rxData is not None and rxData !=b'+TEST: RXLRPKT\r\n':
-            print('キャリアセンス受信')
+            #print('キャリアセンス受信')
             time.sleep(0.05)
             continue
         else:            
@@ -348,8 +349,8 @@ def watch_dog_thread(uart_sim, gpio_sim):
         tx_wdr(uart_sim,imsi)
     gpio_sim.value(0)
     led_ok() #起動完了
-    print('SLEEEEEEPTIME')
-    print(sleep_time)
+    #print('SLEEEEEEPTIME')
+    #print(sleep_time)
     time.sleep(sleep_time)
     
         
@@ -367,7 +368,7 @@ def watch_dog_thread(uart_sim, gpio_sim):
         gpio_sim.value(0)
         if sleep_time < 1800:
             break
-        print(sleep_time)
+        #print(sleep_time)
         time.sleep(sleep_time)
        
         
@@ -392,11 +393,11 @@ def main():
             
 
     ############# 受信時
-    print('-----------------1')
+    #print('-----------------1')
     time.sleep(90)
     while True:
         try:
-            print('-----------------2')
+            #print('-----------------2')
             rx_row_data = rx_lora(uart_lora)
             rx_str_data = pick_lora_data(rx_row_data)
             header_data = f'j314t+{config.version}'.encode('utf-8').hex()
