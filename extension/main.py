@@ -1,3 +1,4 @@
+# v2.2
 from machine import Pin, I2C, UART
 import time
 import config
@@ -85,9 +86,21 @@ def get_lora_id(uart):
     result = result[adress_index+9:adress_index+20]
     return result
 
+def downsystem(uart):
+    '''
+    Loraをsleep状態にし、picoもdeepsleepにする
+    '''
+    uart.write('AT+WDT=OFF\n')
+    recive(uart)
+    uart.write('AT+LOWPOWER\n')
+    recive(uart)
+    time.sleep(1)
+    machine.deepsleep()
+
+
 
 # UART番号とボーレートを指定
-uart = UART(0, 9600)
+uart = UART(1, 9600)
 
 setup_lora(uart)
 lora_id = get_lora_id(uart)
@@ -102,12 +115,12 @@ while True:
     recive(uart)
     rxData = recive(uart)
     if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
-        print(rxData)
-        print('キャリアセンス受信')
+        #print(rxData)
+        #print('キャリアセンス受信')
         time.sleep(1)
         continue
     # TX
-    print('tx-------------')
+    #print('tx-------------')
     uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
     recive(uart)
     time.sleep(5)
@@ -116,15 +129,17 @@ while True:
     return_data = check_return(uart)
     if return_data is not None:
         if confirmation_data.lower() in return_data.lower():
-            print('OK!')
+            #print('OK!')
             led_ok()
-            machine.deepsleep()
+            break
         else:
             count += 1
     else:
         count += 1
     if count == 2:
-        machine.deepsleep()
+        break
+
+downsystem(uart)
             
     
         
