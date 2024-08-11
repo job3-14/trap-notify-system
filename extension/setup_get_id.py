@@ -23,7 +23,7 @@ def recive(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            #print(buf)  #デバッグ時に使用!!!!!!!!!
+            print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
     return
 
@@ -59,7 +59,7 @@ def get_lora_id(uart):
 
 
 # UART番号とボーレートを指定
-uart = UART(0, 9600)
+uart = UART(1, 9600)
 setup_lora(uart)
 print('------------------\n')
 print(get_lora_id(uart))

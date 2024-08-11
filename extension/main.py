@@ -21,7 +21,7 @@ def recive(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            print(buf)  #デバッグ時に使用!!!!!!!!!
+            #print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
     return
 
@@ -31,6 +31,8 @@ def check_return(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
+    uart.write('AT+ MODE= TEST\n')
+    recive(uart)
     uart.write('AT+ TEST= RXLRPKT\n')
     time.sleep(1)
     recive(uart)
@@ -38,9 +40,9 @@ def check_return(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            print(buf)  #デバッグ時に使用!!!!!!!!!
+            #print(buf)  #デバッグ時に使用!!!!!!!!!
             buf = buf.decode()
-            print(buf)
+            #print(buf)
             return buf
         time.sleep(1)
     return None
@@ -143,6 +145,7 @@ downsystem(uart)
             
     
         
+
 
 
 

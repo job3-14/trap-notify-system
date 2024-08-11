@@ -178,6 +178,8 @@ def tx_lora(uart, rx_data):
     data = 送信するデータ(16進数)
     '''
     while True:
+        uart.write('AT+ MODE= TEST\n')
+        recive(uart)
         # caria cense
         recive(uart)
         uart.write('AT+ TEST= RXLRPKT\n')
@@ -188,7 +190,7 @@ def tx_lora(uart, rx_data):
             #print('キャリアセンス受信')
             time.sleep(0.05)
             continue
-        else:            
+        else:
             uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
             recive(uart)
             return
@@ -386,7 +388,6 @@ def main():
         
         time.sleep(3) #######
         _thread.start_new_thread(watch_dog_thread,(uart_sim, gpio_sim))
-        setup_lora(uart_lora)
     except:
         while True:
             led_ok() #エラー時
@@ -397,7 +398,8 @@ def main():
     time.sleep(90)
     while True:
         try:
-            #print('-----------------2')
+            setup_lora(uart_lora)
+            print('-----------------2')
             rx_row_data = rx_lora(uart_lora)
             rx_str_data = pick_lora_data(rx_row_data)
             header_data = f'j314t+{config.version}'.encode('utf-8').hex()
@@ -441,6 +443,8 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
 
 
 
