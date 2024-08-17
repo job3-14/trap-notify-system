@@ -1,4 +1,4 @@
-# v2.2
+# v2.3
 from machine import Pin, I2C, UART
 import time
 import config
@@ -31,10 +31,9 @@ def check_return(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
-    uart.write('AT+ MODE= TEST\n')
-    recive(uart)
+    #uart.write('AT+ MODE= TEST\n')
+    #recive(uart)
     uart.write('AT+ TEST= RXLRPKT\n')
-    time.sleep(1)
     recive(uart)
     for i in range(90):
         buf = uart.read(100)
@@ -116,35 +115,41 @@ while True:
     uart.write('AT+ TEST= RXLRPKT\n')
     recive(uart)
     rxData = recive(uart)
+    
     if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
         #print(rxData)
         #print('キャリアセンス受信')
         time.sleep(1)
         continue
     # TX
-    #print('tx-------------')
     uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
     recive(uart)
     time.sleep(5)
+    count += 1
+
+    if count == 3:
+        break
     
     #Check Return
+    #print('Check Return')
     return_data = check_return(uart)
     if return_data is not None:
         if confirmation_data.lower() in return_data.lower():
             #print('OK!')
-            led_ok()
             break
         else:
             count += 1
     else:
         count += 1
     if count == 2:
-        break
+       break
 
+led_ok()
 downsystem(uart)
             
     
         
+
 
 
 
