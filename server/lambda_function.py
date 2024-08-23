@@ -1,4 +1,6 @@
 # python3.9
+# v2.3
+
 import json
 import boto3
 import urllib.request
@@ -135,7 +137,25 @@ def alert(dynamodb, table_base, table_sub, imsi, txt):
     contents = sub_name + 'が発信されました\n\n' + info
     post_line_notify(api, contents)
     return
-    
+
+
+def alert_boot(dynamodb, table_base, imsi):
+    '''
+    起動アラートを発信する
+    dynamodb = boto3.resource('dynamodb')
+    table_base = dynamodb.Table(table_name親機)
+    IMSI = 発信機親機IMSI
+    '''
+    # imsiからAPIを取得
+    base_result = get_query_record(dynamodb, table_base, imsi)
+    api = base_result['LineNotifyApi']
+    base_name = base_result['name']
+
+    # 通知送信
+    contents = base_name + 'が起動しました'
+    post_line_notify(api, contents)
+    return
+
     
 def rx_decode(data):
     '''
@@ -194,8 +214,9 @@ def lambda_handler(event, context):
 
     elif event['dt'] == 'wdu':   ### 起動受信
         dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table(table_name_base)
-        watchdog_write(dynamodb, table, event['IMSI'], False)
+        table_base = dynamodb.Table(table_name_base)
+        watchdog_write(dynamodb, table_base, event['IMSI'], False)
+        alert_boot(dynamodb, table_base, event['IMSI'])
     
     elif event['dt'] == 'alt':
         dynamodb = boto3.resource('dynamodb')
