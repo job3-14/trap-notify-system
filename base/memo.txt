@@ -1,0 +1,68 @@
+ ＃初期にこれを動かすとなぜか動くようになる
+ 
+        uart.write('AT+CNCFG=1,1,"soracom.io","sora@soracom.io","sora",3\r')
+        recive(uart)
+        print("Sent AT+CNCFG=1,1,\"soracom.io\",\"sora@soracom.io\",\"sora\",3")
+        
+        uart.write('AT\r')
+        recive(uart)
+        
+        uart.write('AT+CPIN?\r')
+        recive(uart)
+
+        
+        uart.write('AT+CFUN=0\r')
+        recive(uart)
+
+        uart.write('AT+CNMP=38\r')
+        recive(uart)
+        
+        uart.write('AT+CMNB=1\r')
+        recive(uart)
+        
+        uart.write('AT+CMNB?\r')
+        recive(uart)
+        
+        uart.write('AT+CNMP?\r')
+        recive(uart)
+        
+        uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
+        recive(uart)
+        
+        uart.write('AT+CNCFG=0,1,"soracom.io"\r')
+        recive(uart)
+        
+        uart.write('AT+CFUN=1\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CGREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CMEE=0\r')
+        recive(uart)
+        
+        uart.write('ATE0\r')
+        recive(uart)
+        
+        uart.write('AT+CLTS=1\r')
+        recive(uart)
+        
+        uart.write('AT+CBATCHK=1\r')
+        recive(uart)
+        
+        uart.write('AT+CPIN?\r')
+        recive(uart)
+        
+        uart.write('AT+CGREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+
