@@ -1,0 +1,577 @@
+# v2.4
+from machine import Pin, I2C, UART
+import time
+import config
+import random
+import _thread
+
+# LED制御
+led = machine.Pin(25, machine.Pin.OUT)
+led.value(1)
+
+
+def recive(uart):
+    '''
+    通信モジュールからのメッセージを受信(シリアル通信)
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    time.sleep(1)
+    for i in range(10):
+        buf = uart.read(100)
+        time.sleep(0.3)
+        if buf is not None:
+            print(buf)  # デバッグ時に使用!!!!!!!!!
+            return buf
+    return None  # 明示的にNoneを返す
+
+
+# LEDを点滅させる
+def led_ok():
+    for i in range(5):
+        led.value(1)
+        time.sleep(0.3)
+        led.value(0)
+        time.sleep(0.3)
+    return
+
+def led_5sec():
+    for i in range(3):
+        led.value(0)
+        time.sleep(1)
+        led.value(1)
+        time.sleep(1)
+    return
+
+def setup_sim(uart):
+    '''
+    SIM7080GをAPN接続まで行う
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    try:
+        time.sleep(20)
+        deactive_count = 0
+        sim_status = ''
+
+        uart.write('AT+CNCFG=1,1,"soracom.io","sora@soracom.io","sora",3\r')
+        recive(uart)
+        print("Sent AT+CNCFG=1,1,\"soracom.io\",\"sora@soracom.io\",\"sora\",3")
+        
+        uart.write('AT\r')
+        recive(uart)
+        
+        uart.write('AT+CPIN?\r')
+        recive(uart)
+
+        
+        uart.write('AT+CFUN=0\r')
+        recive(uart)
+
+        uart.write('AT+CNMP=38\r')
+        recive(uart)
+        
+        uart.write('AT+CMNB=1\r')
+        recive(uart)
+        
+        uart.write('AT+CMNB?\r')
+        recive(uart)
+        
+        uart.write('AT+CNMP?\r')
+        recive(uart)
+        
+        uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
+        recive(uart)
+        
+        uart.write('AT+CNCFG=0,1,"soracom.io"\r')
+        recive(uart)
+        
+        uart.write('AT+CFUN=1\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CGREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CMEE=0\r')
+        recive(uart)
+        
+        uart.write('ATE0\r')
+        recive(uart)
+        
+        uart.write('AT+CLTS=1\r')
+        recive(uart)
+        
+        uart.write('AT+CBATCHK=1\r')
+        recive(uart)
+        
+        uart.write('AT+CPIN?\r')
+        recive(uart)
+        
+        uart.write('AT+CGREG?\r')
+        recive(uart)
+        
+        uart.write('AT+CEREG?\r')
+        recive(uart)
+        
+
+
+
+        
+        '''
+        uart.write('AT+CGMR\r')
+        recive(uart)
+        print("Sent AT+CGMR")
+        '''
+        while True:
+            uart.write('AT+CSQ\r')
+            recive(uart)
+            uart.write('AT+CNACT=0,1\r')
+            time.sleep(1)
+            sim_status = recive(uart)
+            print(sim_status)
+            if sim_status and b'DEACTIVE' in sim_status:
+                deactive_count += 1
+                print(f"DEACTIVEが検出されました。カウント: {deactive_count}")
+                led_5sec()
+                if deactive_count >= 25:
+                    while True:
+                        led_ok()
+            elif sim_status and b'ACTIVE' in sim_status:
+                print("SIMがACTIVEです。ループを抜けます。")
+                break
+            else:
+                print("ステータスが不明です。")
+            uart.write('AT+CPIN?\r')
+            recive(uart)
+    except Exception as e:
+        print(f"setup_sim exception: {e}")
+        while True:
+            led_ok()
+
+def setup_lora(uart):
+    '''
+    Wio E5のセットアップを実行
+    周波数などをセット
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    try:
+        uart.write('AT+UART=TIMEOUT,0\n')
+        recive(uart)
+        print("Sent AT+UART=TIMEOUT,0")
+        
+        uart.write('AT+MODE=TEST\n')  # スペースを削除
+        recive(uart)
+        print("Sent AT+MODE=TEST")
+        
+        uart.write('AT+TEST=?\n')
+        recive(uart)
+        print("Sent AT+TEST=?")
+        
+        uart.write('AT+TEST=RFCFG,' + str(config.frequency) + ',SF12,125,12,15,' + str(config.pwr) + ',ON,OFF,OFF\n')
+        recive(uart)
+        print(f"Sent AT+TEST=RFCFG with frequency {config.frequency} and power {config.pwr}")
+    except Exception as e:
+        print(f"setup_lora exception: {e}")
+        while True:
+            led_ok()
+
+def get_imsi(uart):
+    '''
+    IMSIを取得しstr型で返す
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    uart.write('AT+CIMI\r')
+    imsi = recive(uart)
+    #print('###############')
+    #print(imsi)
+    imsi = imsi.decode()
+    imsi_find = imsi.find('440')
+    imsi = imsi[imsi_find:imsi_find+15]
+    return imsi
+
+
+
+def rx_lora(uart):
+    '''
+    Loraを受信し、受信内容を返す
+
+    uart = 対応機器のuartインスタンスが必要
+    '''
+    recive(uart)
+    uart.write('AT+TEST=RXLRPKT\n')  # スペースを削除
+    while True:
+        rxData = uart.read(100)
+        if rxData is not None and b'+TEST: LEN' in rxData and b'TIMEOUT' not in rxData:
+            rxData_str = rxData.decode()
+            print('受信内容：')
+            print(rxData_str)
+            return rxData_str
+        time.sleep(1)
+        
+
+def tx_json(uart,json_dict):
+    '''
+    jsonをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
+    '''
+    word_count = str(31 + len(json_dict['IMSI']) + len(json_dict['txt']))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD=' + word_count + ',10000\r')  # mozisuunositei
+    recive(uart)
+    uart.write('{"dt":"alt","IMSI":"' + json_dict['IMSI'] + '","txt":"' + json_dict['txt'] + '"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+    return
+
+
+def check_header(data):
+    '''
+    受信したデータが発信機からのものか確認をする
+
+    data = loraで受信した生データ(str)
+    '''
+    return
+
+
+def pick_lora_data(data):
+    '''
+    受信したデータのデータ部のみを取り出す関数
+
+    data = loraで受信した生データ(str)
+    '''
+    start_index = data.find('"')+1
+    finish_index = data.rfind('"')
+    rx_data = data[start_index:finish_index]
+    return rx_data
+
+def gpio_power(gpio_pin, switch):
+    '''
+    GPIOのオン・オフを切り替えする関数
+    gpio_pin = machine.Pin(22, machine.Pin.OUT)
+    switch = 0->オフ, 1->オン
+    '''
+    gpio_pin.value(switch)
+    return
+
+
+def tx_lora(uart, rx_data):
+    '''
+    loraでデータを送信する関数
+
+    uart = 対応機器のuartインスタンスが必要
+    data = 送信するデータ(16進数)
+    '''
+    while True:
+        uart.write('AT+MODE=TEST\n')  # スペースを削除
+        recive(uart)
+        # caria cense
+        recive(uart)
+        uart.write('AT+TEST=RXLRPKT\n')  # スペースを削除
+        time.sleep(0.005)
+        recive(uart)
+        rxData = recive(uart)
+        if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
+            #print('キャリアセンス受信')
+            time.sleep(0.05)
+            continue
+        else:
+            uart.write('AT+TEST=TXLRPKT,"' + rx_data + '"\n')  # スペースを削除
+            recive(uart)
+            return
+            
+
+def tx_return_lora(uart, rx_data):
+    '''
+    loraで応答データを
+
+    uart = 対応機器のuartインスタンスが必要
+    data = 送信するデータ(16進数)
+    '''
+    for i in range(3):
+        tx_lora(uart, rx_data)
+        time.sleep(round(random.uniform(5.0, 8.0), 1)) #5.0秒から8.0秒ランダム
+
+
+def json_escape_string(s):
+    escape_chars = {
+        '\\': '\\\\',
+        '"': '\\"',
+        '\'': '\\\'',
+        '\n': '\\n',
+        '\r': '\\r',
+        '\t': '\\t',
+        '\b': '\\b',
+        '\f': '\\f',
+    }
+    
+    escaped_str = ''
+    for char in s:
+        if char in escape_chars:
+            escaped_str += escape_chars[char]
+        else:
+            escaped_str += char
+    
+    return escaped_str
+
+def extract_hour(cclk_response):
+    # 応答文字列を改行で分割して配列に変換
+    lines = cclk_response.split('\r\n')
+    
+    # +CCLKの行を見つける
+    for line in lines:
+        if line.startswith('+CCLK:'):
+            # 時刻部分を抽出
+            datetime_str = line.split('"')[1]
+            # 時刻を分割して時間部分を取得
+            hour = datetime_str.split(',')[1].split(':')[0]
+            return int(hour)
+    
+    return None
+
+
+def calculate_hours_until_4(current_hour):
+    if current_hour < 4:
+        return 4 - current_hour
+    else:
+        return 24 - current_hour + 4
+    
+
+def tx_wdu(uart, imsi):
+    '''
+    wduをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
+    '''
+    word_count = str(22 + len(imsi))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD=' + word_count + ',10000\r')  # mozisuunositei
+    recive(uart)
+    uart.write('{"dt":"wdu","IMSI":"' + imsi + '"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    try:
+        time.sleep(10)
+        result = recive(uart)
+        if result:
+            result = result.decode()
+            while True:
+                if '"POST",200' in result:
+                    break
+                led_5sec()
+                result = recive(uart)
+                if result:
+                    result = result.decode()
+                else:
+                    break  # 受信がない場合はループを抜ける
+                led_ok()  # エラー時
+        else:
+            print("No response received for AT+SHREQ")
+    except Exception as e:
+        print(f"tx_wdu exception: {e}")
+        while True:
+            led_ok()
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)  # ERRORは無視
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+    return result
+
+
+
+def tx_wdr(uart,imsi):
+    '''
+    wdrをsoracom FUNK に送信します。
+
+    uart = 対応機器のuartインスタンスが必要
+    json_dict['IMSI']= IMSI番号str
+    json_dict['txt'] = 送信テキスト
+    '''
+    word_count = str(22 + len(imsi))
+    uart.write('AT+SHCONF="URL","http://funk.soracom.io"\r')
+    recive(uart)
+    uart.write('AT+SHCONF="BODYLEN",1024\r')
+    recive(uart)
+    uart.write('AT+SHCONF="HEADERLEN",350\r')
+    recive(uart)
+    uart.write('AT+SHCONN\r')
+    recive(uart)
+    uart.write('AT+SHSTATE?\r')
+    recive(uart)
+    uart.write('AT+SHCHEAD\r')
+    recive(uart)
+    uart.write('AT+SHAHEAD="Content-Type","application/json"\r')
+    recive(uart)
+    uart.write('AT+SHBOD=' + word_count + ',10000\r')  # mozisuunositei
+    recive(uart)
+    uart.write('{"dt":"wdr","IMSI":"' + imsi + '"}\r')
+    recive(uart)
+    uart.write('AT+SHREQ="/post",3\r')
+    recive(uart)
+    uart.write('AT+SHREAD=0,1024\r')
+    recive(uart)
+    uart.write('AT+SHDISC\r')
+    recive(uart)
+    return
+
+def get_sleep_time(uart):
+    uart.write('AT+CCLK?\r')
+    time_sim = recive(uart).decode()
+    time_sim = extract_hour(time_sim)
+    sleep_time = calculate_hours_until_4(time_sim)
+    return sleep_time
+
+
+def watch_dog_thread(uart_sim, gpio_sim, uart_lora):
+    try:
+        gpio_sim.value(1)
+        time.sleep(3)
+        setup_sim(uart_sim)
+        imsi = get_imsi(uart_sim)
+        up_result = tx_wdu(uart_sim, imsi)
+        sleep_time = get_sleep_time(uart_sim) * 60 * 60
+        if sleep_time == 86400:
+            tx_wdr(uart_sim, imsi)
+        gpio_sim.value(0)
+        led_ok()  # 起動完了
+        print('SLEEP TIME: ' + str(sleep_time))
+        time.sleep(sleep_time)
+        while True:
+            if gpio_sim.value() == 1:
+                time.sleep(10)
+                continue
+            time.sleep(3)
+            gpio_sim.value(1)
+            time.sleep(3)
+            setup_sim(uart_sim)
+            tx_wdr(uart_sim, imsi)
+            sleep_time = get_sleep_time(uart_sim) * 60 * 60
+            if sleep_time == 0:
+                sleep_time = 86400
+            gpio_sim.value(0)
+            print('SLEEP TIME: ' + str(sleep_time))
+            setup_lora(uart_lora)
+            uart_lora.write('AT+TEST=RXLRPKT\n')
+            print('SLEEP TIME: ' + str(sleep_time))
+            led.value(0)
+            time.sleep(sleep_time)
+    except Exception as e:
+        print(f"Watchdog thread exception: {e}")
+        while True:
+            led_ok()
+
+
+
+
+def lora_main_loop(uart_lora, uart_sim, gpio_sim):
+    error_count = 0
+    while True:
+        try:
+            setup_lora(uart_lora)
+            print('-----------------2')
+            rx_row_data = rx_lora(uart_lora)
+            rx_str_data = pick_lora_data(rx_row_data)
+            header_data = f'j314t+{config.version}'.encode('utf-8').hex()
+            if header_data.lower() in rx_str_data.lower():
+                if gpio_sim.value() == 1:
+                    time.sleep(90)
+                gpio_sim.value(0)
+                time.sleep(1)
+                gpio_sim.value(1)        #SIM7080Gの電源を入れる
+                time.sleep(3)
+                setup_sim(uart_sim)
+                tx_json_data = {'dt': 'alt'}
+                tx_json_data['IMSI'] = get_imsi(uart_sim) #################
+                tx_json_data['txt'] = json_escape_string(rx_row_data)
+                tx_json(uart_sim,tx_json_data)
+                return_data = rx_str_data+'30'
+                setup_lora(uart_lora)
+                tx_return_lora(uart_lora, return_data)
+                gpio_sim.value(0)       #SIM7080Gの電源を切る
+                led.value(0)
+                error_count = 0
+        except:
+             error_count += 1
+             if error_count == 3:
+                 for i in range(10):
+                     led_ok()
+                 gpio_sim.value(0)
+                 machine.deepsleep()
+             else:
+                continue
+
+
+def main():
+    try:
+        # UART番号とボーレートを指定
+        uart_sim = UART(0, 115200)
+        uart_lora = UART(1, 9600)
+        gpio_sim = machine.Pin(22, machine.Pin.OUT)
+        
+        time.sleep(3) #######
+        _thread.start_new_thread(watch_dog_thread, (uart_sim, gpio_sim, uart_lora))
+        print("Watchdog thread started.")
+    except Exception as e:
+        print(f"Main thread initialization exception: {e}")
+        while True:
+            led_ok()  # エラー時
+                
+    ############# 受信時
+    time.sleep(10)
+    while True:
+        if gpio_sim.value() == 0:
+            print("GPIO_sim is 0, proceeding to LoRa setup.")
+            break
+        time.sleep(10)
+    print('-----------------1')
+    lora_main_loop(uart_lora, uart_sim, gpio_sim)
+
+
+
+if __name__ == '__main__':
+    main()
+
