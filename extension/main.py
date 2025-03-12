@@ -1,4 +1,4 @@
-# v2.3
+# v2.5
 from machine import Pin, I2C, UART
 import time
 import config
@@ -21,7 +21,7 @@ def recive(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            #print(buf)  #デバッグ時に使用!!!!!!!!!
+            print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
     return
 
@@ -31,20 +31,17 @@ def check_return(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
-    #uart.write('AT+ MODE= TEST\n')
-    #recive(uart)
-    uart.write('AT+ TEST= RXLRPKT\n')
+    time.sleep(10)
     recive(uart)
-    for i in range(90):
-        buf = uart.read(100)
-        time.sleep(0.3)
-        if buf != None:
-            #print(buf)  #デバッグ時に使用!!!!!!!!!
-            buf = buf.decode()
-            #print(buf)
-            return buf
+    uart.write('AT+ TEST= RXLRPKT\n') # スペースを削除
+    for i in range(random.randint(120, 240)):
+        rxData = uart.read(100)
+        if rxData is not None and b'+TEST: LEN' in rxData and b'TIMEOUT' not in rxData:
+            rxData_str = rxData.decode()
+            print('受信内容：')
+            print(rxData_str)
+            return rxData_str
         time.sleep(1)
-    return None
 
 
 #LEDを点滅させる
@@ -92,10 +89,11 @@ def downsystem(uart):
     Loraをsleep状態にし、picoもdeepsleepにする
     '''
     uart.write('AT+WDT=OFF\n')
+    time.sleep(3)
     recive(uart)
-    uart.write('AT+LOWPOWER\n')
+    uart.write('AT+LOWPOWER=AUTOON\n')
+    time.sleep(3)
     recive(uart)
-    time.sleep(1)
     machine.deepsleep()
 
 
@@ -124,14 +122,14 @@ while True:
     # TX
     uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
     recive(uart)
-    time.sleep(5)
-    count += 1
-
-    if count == 3:
-        break
+    time.sleep(10)
+    uart.write('AT+RESET\n')
+    recive(uart)
+    setup_lora(uart)
     
     #Check Return
     #print('Check Return')
+    return_data = None
     return_data = check_return(uart)
     if return_data is not None:
         if confirmation_data.lower() in return_data.lower():
@@ -141,16 +139,11 @@ while True:
             count += 1
     else:
         count += 1
-    if count == 2:
+    
+    # 親機から返答がない場合の繰り返し回数
+    if count == 10:
        break
+    
 
 led_ok()
 downsystem(uart)
-            
-    
-        
-
-
-
-
-
