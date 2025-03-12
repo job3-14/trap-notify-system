@@ -1,4 +1,4 @@
-# v2.4
+# v2.5
 from machine import Pin, I2C, UART
 import time
 import config
@@ -51,7 +51,7 @@ def setup_sim(uart):
     uart = 対応機器のuartインスタンスが必要
     '''
     try:
-        time.sleep(20)
+        time.sleep(10)
         deactive_count = 0
         sim_status = ''
         uart.write('AT+CGDCONT=1,"IP","soracom.io"\r')
@@ -105,6 +105,8 @@ def setup_lora(uart):
     uart = 対応機器のuartインスタンスが必要
     '''
     try:
+        uart.write('AT+RESET\n')
+        recive(uart)
         uart.write('AT+UART=TIMEOUT,0\n')
         recive(uart)
         print("Sent AT+UART=TIMEOUT,0")
@@ -233,8 +235,8 @@ def tx_lora(uart, rx_data):
     uart = 対応機器のuartインスタンスが必要
     data = 送信するデータ(16進数)
     '''
+    #uart.write('AT+MODE=TEST\n')  # スペースを削除
     while True:
-        uart.write('AT+MODE=TEST\n')  # スペースを削除
         recive(uart)
         # caria cense
         recive(uart)
@@ -247,8 +249,10 @@ def tx_lora(uart, rx_data):
             time.sleep(0.05)
             continue
         else:
-            uart.write('AT+TEST=TXLRPKT,"' + rx_data + '"\n')  # スペースを削除
+            uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
+            time.sleep(5)
             recive(uart)
+            led_ok()
             return
             
 
@@ -517,4 +521,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
