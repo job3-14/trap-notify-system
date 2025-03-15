@@ -61,6 +61,8 @@ def setup_lora(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
     uart.write('AT+UART=TIMEOUT,0\n')
     recive(uart)
     uart.write('AT+ MODE= TEST\n')
