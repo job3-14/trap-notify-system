@@ -11,14 +11,14 @@ led.value(1)
 
 
 
-def recive(uart):
+def recive(uart, set_range=10):
     '''
     通信モジュールからのメッセージを受信(シリアル通信)
 
     uart = 対応機器のuartインスタンスが必要
     '''
     time.sleep(1)
-    for i in range(10):
+    for i in range(set_range):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
@@ -130,9 +130,9 @@ def tx_json(uart,json_dict):
     uart.write('AT+SHBOD='+word_count+',10000\r')  # mozisuunositei
     recive(uart)
     uart.write('{"dt":"alt","IMSI":"'+json_dict['IMSI']+'","txt":"'+json_dict['txt']+'"}\r')
-    recive(uart)
+    recive(uart,9999)
     uart.write('AT+SHREQ="/post",3\r')
-    recive(uart)
+    recive(uart,9999)
     uart.write('AT+SHREAD=0,1024\r')
     recive(uart)
     uart.write('AT+SHDISC\r')
