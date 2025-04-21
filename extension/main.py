@@ -1,4 +1,4 @@
-# v2.2
+# v2.6
 from machine import Pin, I2C, UART
 import time
 import config
@@ -21,7 +21,7 @@ def recive(uart):
         buf = uart.read(100)
         time.sleep(0.3)
         if buf != None:
-            #print(buf)  #デバッグ時に使用!!!!!!!!!
+            print(buf)  #デバッグ時に使用!!!!!!!!!
             return buf
     return
 
@@ -31,21 +31,17 @@ def check_return(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
-    uart.write('AT+ MODE= TEST\n')
+    time.sleep(10)
     recive(uart)
-    uart.write('AT+ TEST= RXLRPKT\n')
-    time.sleep(1)
-    recive(uart)
-    for i in range(90):
-        buf = uart.read(100)
-        time.sleep(0.3)
-        if buf != None:
-            #print(buf)  #デバッグ時に使用!!!!!!!!!
-            buf = buf.decode()
-            #print(buf)
-            return buf
+    uart.write('AT+ TEST= RXLRPKT\n') # スペースを削除
+    for i in range(random.randint(120, 240)):
+        rxData = uart.read(100)
+        if rxData is not None and b'+TEST: LEN' in rxData and b'TIMEOUT' not in rxData:
+            rxData_str = rxData.decode()
+            print('受信内容：')
+            print(rxData_str)
+            return rxData_str
         time.sleep(1)
-    return None
 
 
 #LEDを点滅させる
@@ -65,6 +61,27 @@ def setup_lora(uart):
 
     uart = 対応機器のuartインスタンスが必要
     '''
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    uart.write(b'\xFF\xFF\xFF\xFFAT+LOWPOWER=AUTOOFF\r\n')
+    recive(uart)
+    uart.write('AT+UART=TIMEOUT,0\n')
+    recive(uart)
+    time.sleep(10)
     uart.write('AT+UART=TIMEOUT,0\n')
     recive(uart)
     uart.write('AT+ MODE= TEST\n')
@@ -92,11 +109,13 @@ def downsystem(uart):
     '''
     Loraをsleep状態にし、picoもdeepsleepにする
     '''
+    print('====STTART SLEEP===')
     uart.write('AT+WDT=OFF\n')
+    time.sleep(3)
     recive(uart)
-    uart.write('AT+LOWPOWER\n')
+    uart.write('AT+LOWPOWER=AUTOON\n')
+    time.sleep(3)
     recive(uart)
-    time.sleep(1)
     machine.deepsleep()
 
 
@@ -111,41 +130,44 @@ confirmation_data = f'j314t+{config.version}/{lora_id}/0'.encode('utf-8').hex()
 
 count = 0
 while True:
+    print('===start===')
     # caria cense
     recive(uart)
     uart.write('AT+ TEST= RXLRPKT\n')
     recive(uart)
     rxData = recive(uart)
+    
     if rxData is not None and rxData != b'+TEST: RXLRPKT\r\n':
         #print(rxData)
         #print('キャリアセンス受信')
         time.sleep(1)
         continue
     # TX
-    #print('tx-------------')
     uart.write('AT+TEST=TXLRPKT, "'+rx_data+'"\n')
     recive(uart)
-    time.sleep(5)
+    time.sleep(10)
+    uart.write('AT+RESET\n')
+    recive(uart)
+    setup_lora(uart)
+    
     
     #Check Return
+    #print('Check Return')
+    return_data = None
     return_data = check_return(uart)
     if return_data is not None:
         if confirmation_data.lower() in return_data.lower():
             #print('OK!')
-            led_ok()
             break
         else:
             count += 1
     else:
         count += 1
-    if count == 2:
-        break
-
-downsystem(uart)
-            
     
-        
+    # 親機から返答がない場合の繰り返し回数
+    if count >= 10:
+       break
+    
 
-
-
-
+led_ok()
+downsystem(uart)
