@@ -16,6 +16,7 @@ def recive(uart, set_range=10):
     通信モジュールからのメッセージを受信(シリアル通信)
 
     uart = 対応機器のuartインスタンスが必要
+    set_range = 受信を繰り返す回数の指定. 無線送信時などに待機時間を伸ばすため
     '''
     time.sleep(1)
     for i in range(set_range):
