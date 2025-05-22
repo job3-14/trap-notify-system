@@ -1,4 +1,6 @@
 # python3.9
+# v2.4
+
 import json
 import boto3
 import urllib.request
@@ -24,6 +26,43 @@ def post_line_notify(line_api_token, contents):
     conn = urllib.request.urlopen(req)
     return
 
+
+def submit_line_messaging_api(access_token, sent_id, sent_text):
+    """
+    Line Messaging APIでメッセージを送信する関数
+    access_token = アクセストークン
+    sent_id = 送信先ID
+    sent_text = 送信するメッセージ
+    """
+    from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, PushMessageRequest
+
+    # Configurationの初期化
+    configuration = Configuration(
+        host="https://api.line.me",
+        access_token=access_token
+    )
+
+    # メッセージの構築
+    message_dict = {
+        "to": sent_id,
+        "messages": [
+            {
+                "type": "text",
+                "text": sent_text
+            }
+        ]
+    }
+
+    # APIクライアントの作成とメッセージ送信
+    with ApiClient(configuration) as api_client:
+        api_instance = MessagingApi(api_client)
+        push_message_request = PushMessageRequest.from_dict(message_dict)
+
+        try:
+            api_response = api_instance.push_message(push_message_request)
+            print("Message sent successfully:", api_response)
+        except Exception as e:
+            print(f"Exception when calling MessagingApi->push_message: {e}\n")
 
 def get_all_records(dynamodb, table, **kwargs):
     '''
@@ -63,14 +102,27 @@ def watchdog_check(dynamodb, table):
     base_data_list = get_all_records(dynamodb, table)
     
     # 確認と通知送信
+    contents_dict = {}
+    #contents = '[通信不能]\n' # 削除
     for base in base_data_list:
-        print(base['name'])
-        if base['watchdog']:
-            base['watchdog'] = False
+        if base['watchdog']==1:
+            base['watchdog'] = 0
             push_records(dynamodb, table, base)
-        else:
-            contents = f'\n[通信不能] '+ base['name'] + f'が通信確認取れません。\n\n' + '最終確認時刻：' + base['timeStamp'] + f'\nIMSI：' + base['id']
-            post_line_notify(base['LineNotifyApi'],contents)
+        elif base['watchdog']==0:
+            # 辞書にAPIのキーがなければ作成
+            if(base['LineMessaging_sent_id'] in contents_dict):
+                contents_dict[base['LineMessaging_sent_id']] += base['name'] + f'が通信確認取れません。\n' + '最終確認時刻：' + base['timeStamp'] + f'\nIMSI：' + base['id']+ f'\n\n\n'
+            else:
+                contents_dict[base['LineMessaging_sent_id']] = base['name'] + f'が通信確認取れません。\n' + '最終確認時刻：' + base['timeStamp'] + f'\nIMSI：' + base['id']+ f'\n\n\n'
+            # {API:contenrs} 
+            base['watchdog'] = -1
+            push_records(dynamodb, table, base)
+
+    if len(contents_dict) != 0:  # 辞書に値があるかをチェックに変更
+        for key in contents_dict.keys():
+            contents_dict[key] = contents_dict[key][:-3]
+            submit_line_messaging_api(base['LineMessaging_API'],key,contents_dict[key])
+
     return
 
 def get_query_record(dynamodb, table, key):
@@ -94,7 +146,7 @@ def watchdog_write(dynamodb, table, imsi, watchdog):
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
     imsi = id
-    watchdog = True->watchdog False->起動時  通知の有無です.
+    watchdog = 1->watchdog, 0->起動時  通知の有無です.
     '''
     result_data = get_query_record(dynamodb, table, imsi)
     result_data['watchdog'] = watchdog
@@ -116,7 +168,7 @@ def alert(dynamodb, table_base, table_sub, imsi, txt):
     '''
     # imsiからAPIを取得
     base_result = get_query_record(dynamodb, table_base, imsi)
-    api = base_result['LineNotifyApi']
+    watchdog_status = base_result['watchdog']
     
     # 受信内容を解析
     rx_data = rx_decode(txt)  # 16進数から文字列に変換
@@ -125,17 +177,36 @@ def alert(dynamodb, table_base, table_sub, imsi, txt):
     
     
     # 子機の名前をシリアルナンバーから取得
-    sub_name = get_query_record(dynamodb, table_sub, sn)
-    sub_name = sub_name['name']
+    sub_data = get_query_record(dynamodb, table_sub, sn)
+    sub_name = sub_data['name']
+    LineMessaging_sent_id = sub_data['LineMessaging_sent_id']
+    
     
     # タイムスタンプ更新
-    watchdog_write(dynamodb, table_base, imsi, False)
+    watchdog_write(dynamodb, table_base, imsi, watchdog_status)
 
     # 通知送信
     contents = sub_name + 'が発信されました\n\n' + info
-    post_line_notify(api, contents)
+    submit_line_messaging_api(base_result['LineMessaging_API'],LineMessaging_sent_id,contents)
     return
-    
+
+
+def alert_boot(dynamodb, table_base, imsi):
+    '''
+    起動アラートを発信する
+    dynamodb = boto3.resource('dynamodb')
+    table_base = dynamodb.Table(table_name親機)
+    IMSI = 発信機親機IMSI
+    '''
+    # imsiからAPIを取得
+    base_result = get_query_record(dynamodb, table_base, imsi)
+    base_name = base_result['name']
+
+    # 通知送信
+    contents = base_name + 'が起動しました'
+    submit_line_messaging_api(base_result['LineMessaging_API'],base_result['LineMessaging_sent_id'],contents)
+    return
+
     
 def rx_decode(data):
     '''
@@ -173,6 +244,17 @@ def take_sn(data):
     index.append(data.rfind('/'))
     data_info = data[index[0]:index[1]]
     return data_info
+
+def save_log(event):
+    '''
+    ログをS3に保存
+    '''
+    s3 = boto3.client('s3')
+    file_contents = str(event)
+    bucket = 'traplog'
+    key = 'log_' + datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '.txt'
+    response = s3.put_object(Body=file_contents, Bucket=bucket, Key=key)
+    return response
     
 
 
@@ -181,6 +263,7 @@ def lambda_handler(event, context):
     #post_line_notify('6PXw02i28OwCMycNcdpZ8KqlJZUWP8BcFn5rz9xuBql', 'プログラム実行') ##########test
     table_name_base = 'Trap_notify_Kamigamo_base'
     table_name = 'Trap_notify_Kamigamo'
+    save_log(event)
     #try:
     if event['dt'] == 'wdc':   ### タイマーwatchdog監視
         dynamodb = boto3.resource('dynamodb')
@@ -190,12 +273,13 @@ def lambda_handler(event, context):
     elif event['dt'] == 'wdr':   ### WatchDog受信
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table(table_name_base)
-        watchdog_write(dynamodb, table, event['IMSI'], True)
+        watchdog_write(dynamodb, table, event['IMSI'], 1)
 
     elif event['dt'] == 'wdu':   ### 起動受信
         dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table(table_name_base)
-        watchdog_write(dynamodb, table, event['IMSI'], False)
+        table_base = dynamodb.Table(table_name_base)
+        watchdog_write(dynamodb, table_base, event['IMSI'], 0)
+        alert_boot(dynamodb, table_base, event['IMSI'])
     
     elif event['dt'] == 'alt':
         dynamodb = boto3.resource('dynamodb')
